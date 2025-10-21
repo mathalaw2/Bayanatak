@@ -145,6 +145,7 @@
         // ******************************************************************************
         
         // 1.1. إعدادات Firebase الثابتة:
+        // *** هذا المفتاح هو الذي أرسلته سابقًا، وقد يكون هو سبب المشكلة إذا كان مقيداً. ***
         const MANUAL_FIREBASE_CONFIG = {
             apiKey: "AIzaSyOCx8-XKNGBXMNNAXBWEjOcD4YC4",
             authDomain: "bayanatak-f8c09.firebaseapp.com",
@@ -199,7 +200,7 @@
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // **تم إزالة المصادقة المخصصة واستخدام المصادقة المجهولة فقط**
+                // **استخدام المصادقة المجهولة**
                 await signInAnonymously(auth);
 
                 userId = auth.currentUser?.uid || 'Unknown-User';
@@ -212,7 +213,14 @@
 
             } catch (error) {
                 console.error("Error during Firebase initialization or authentication:", error);
-                displayError(`فشل الاتصال بالخدمة: ${error.message}. تأكد من تفعيل قواعد الأمان وخدمة المصادقة المجهولة.`);
+                
+                // **** التعديل هنا: إضافة رسالة توجيهية خاصة لمشكلة المفتاح ****
+                if (error.code === 'auth/api-key-not-valid') {
+                     displayError('خطأ في الاتصال: مفتاح API غير صالح. يرجى مراجعة إعدادات Firebase والـ API Key والتأكد من عدم وجود قيود عليه.');
+                } else {
+                     displayError(`فشل الاتصال بالخدمة: ${error.message}. تأكد من تفعيل قواعد الأمان والمصادقة المجهولة.`);
+                }
+                
             } finally {
                 loadingIndicator.style.display = 'none';
             }
