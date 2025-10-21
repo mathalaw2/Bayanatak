@@ -1,493 +1,251 @@
-<!--
-    تطبيق قاعدة بيانات الناخبين المشتركة (Firebase Firestore)
-    هذا الملف يجمع بين نموذج الإدخال، خاصية البحث، والمزامنة الفورية للبيانات.
-    يستخدم Tailwind CSS للتصميم المتجاوب.
--->
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>سجل الناخبين المشترك - مزامنة فورية</title>
-    <!-- تحميل Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- خط Inter (لتحسين القراءة على مختلف الأجهزة) -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fc;
-        }
-        .card {
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
-        }
-        .data-table {
-            border-collapse: separate;
-            border-spacing: 0;
-            width: 100%;
-        }
-        .data-table th, .data-table td {
-            padding: 12px 15px;
-            text-align: right;
-            border-bottom: 1px solid #e5e7eb;
-            vertical-align: middle;
-        }
-        .data-table th {
-            background-color: #f3f4f6;
-            color: #1f2937;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .data-table tr:hover {
-            background-color: #f9fafb;
-        }
-        /* لتطبيق RTL على حقول الإدخال */
-        input::placeholder {
-            text-align: right;
-        }
-        .edit-input {
-            border: 1px solid #ccc;
-            padding: 4px 8px;
-            border-radius: 4px;
-            width: 100%;
-            text-align: right;
-        }
-    </style>
-</head>
-<body class="p-4 sm:p-8">
+    <title>قاعدة بيانات الناخبين المشتركة</title>
+    </head>
+<body>
+    <h1>إدارة قاعدة بيانات الناخبين (Firestore)</h1>
+    
+    <form id="voterForm">
+        <input type="text" id="voterName" placeholder="اسم الناخب" required>
+        <input type="text" id="voterNationalId" placeholder="الرقم القومي (14 رقم)" pattern="[0-9]{14}" required>
+        <button type="submit">إضافة ناخب</button>
+        <p id="formMessage" style="color: red;"></p>
+    </form>
+    
+    <hr>
+    
+    <input type="text" id="searchField" placeholder="ابحث بالاسم أو الرقم القومي" oninput="filterAndRenderTable()">
+    
+    <h2>سجلات الناخبين:</h2>
+    <table id="votersTable" border="1" width="100%">
+        <thead>
+            <tr>
+                <th>الرقم القومي</th>
+                <th>الاسم</th>
+                <th>الإجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            </tbody>
+    </table>
 
-    <div class="max-w-7xl mx-auto">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-extrabold text-blue-800 mb-2">قاعدة بيانات الناخبين المشتركة</h1>
-            <p class="text-gray-600">إضافة، بحث، وتعديل ومزامنة فورية للبيانات بين جميع المشاركين.</p>
-            <div id="loadingIndicator" class="mt-4 text-blue-500 font-semibold" style="display: none;">جارٍ تحميل وتهيئة البيانات...</div>
-            <p id="userIdDisplay" class="text-xs mt-2 p-1 bg-blue-100 rounded inline-block">معرّف الجلسة: جارٍ التحميل...</p>
-        </header>
-
-        <!-- قسم الإدخال - إضافة ناخب جديد -->
-        <div class="card bg-white p-6 rounded-xl mb-8">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">إضافة ناخب جديد</h2>
-            <form id="voterForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <!-- حقل الاسم -->
-                    <input type="text" id="name" placeholder="الاسم كاملاً" required
-                           class="col-span-1 md:col-span-2 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
-                           title="الاسم الكامل للناخب">
-
-                    <!-- حقل الرقم القومي -->
-                    <input type="text" id="nationalId" placeholder="الرقم القومي (14 رقم)" required maxlength="14" pattern="[0-9]{14}"
-                           class="col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
-                           title="يجب أن يكون الرقم القومي 14 رقماً">
-
-                    <!-- حقل اللجنة -->
-                    <input type="text" id="committee" placeholder="اسم/مقر اللجنة" required
-                           class="col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
-                           title="اسم أو عنوان مقر اللجنة">
-
-                    <!-- حقل رقم اللجنة -->
-                    <input type="number" id="committeeNumber" placeholder="رقم اللجنة" required
-                           class="col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
-                           title="رقم اللجنة الفرعي">
-                </div>
-
-                <button type="submit" id="submitBtn"
-                        class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out disabled:bg-gray-400">
-                    إضافة ناخب
-                </button>
-                <p id="errorMsg" class="text-red-600 text-center mt-2" style="display: none;"></p>
-            </form>
-        </div>
-
-        <!-- قسم البحث والجدول -->
-        <div class="card bg-white p-6 rounded-xl">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">سجل الناخبين (مزامنة فورية)</h2>
-
-            <!-- حقل البحث -->
-            <input type="text" id="searchQuery" placeholder="ابحث بالاسم أو الرقم القومي..."
-                   class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-purple-500 focus:border-purple-500 text-right"
-                   title="للبحث الفوري عن بيانات الناخبين">
-
-            <!-- مؤشر حالة البحث -->
-            <p id="searchStatus" class="text-sm text-gray-500 mb-3" style="display: none;"></p>
-
-            <div class="overflow-x-auto">
-                <table id="votersTable" class="data-table">
-                    <thead>
-                        <tr>
-                            <th class="rounded-tr-lg w-16">مسلسل</th>
-                            <th class="w-1/4">الاسم</th>
-                            <th class="w-1/5">الرقم القومي</th>
-                            <th class="w-1/6">اللجنة</th>
-                            <th class="w-16">رقم اللجنة</th>
-                            <th class="rounded-tl-lg w-32">الإجراءات</th> <!-- عمود الإجراءات الجديد -->
-                        </tr>
-                    </thead>
-                    <tbody id="votersTableBody">
-                        <!-- سيتم ملء البيانات هنا بواسطة JavaScript -->
-                        <tr id="emptyRow">
-                            <td colspan="6" class="text-center text-gray-500 py-6">لا توجد بيانات متاحة.</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- Firebase Imports -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, setLogLevel, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // ******************************************************************************
-        // ****** 1. الإعدادات الثابتة لمشروع Firebase (تم لصقها من الصورة المرفقة) *******
-        // ******************************************************************************
+        // 1. استيراد المكتبات الضرورية
+        import { initializeApp } from "https://www.gstatic.com/firebase/9/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebase/9/firebase-firestore.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebase/9/firebase-auth.js";
         
-        // 1.1. إعدادات Firebase الثابتة:
-        // *** المفتاح الجديد والصحيح من إعدادات مشروعك: AIzaSyD8oB5AVadAIj_rKEIhialPDZml1PhiJXM ***
-        const MANUAL_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyD8oB5AVadAIj_rKEIhialPDZml1PhiJXM", // تم التحديث إلى المفتاح الصحيح الجديد
-            authDomain: "bayanatak-f8c09.firebaseapp.com",
-            projectId: "bayanatak-f8c09",
-            storageBucket: "bayanatak-f8c09.appspot.com",
-            messagingSenderId: "371861213823",
-            appId: "1:371861213823:web:885894fd8c89187d41d64a",
-            measurementId: "G-RSHKVQBL7N"
+        // 2. إعدادات Firebase الثابتة
+        // **********************************************
+        // ** تأكد من استبدال المفاتيح ببيانات مشروعك الفعلية **
+        // **********************************************
+        const firebaseConfig = {
+            apiKey: "AIzaSyD8oB5AVadAIj_rKEIhialPDZml1PhiJXM", // المفتاح الفعّال من دليلك
+            authDomain: "bayanatak-f8c09.firebaseapp.com", // استبدل بمعرّف مشروعك
+            projectId: "bayanatak-f8c09", // معرّف المشروع الخاص بك
+            storageBucket: "bayanatak-f8c09.appspot.com", // استبدل بمعرّف مشروعك
+            messagingSenderId: "...", // استبدل بالمعرّف الفعلي
+            appId: "..." // استبدل بالمعرّف الفعلي
         };
         
-        // 1.2. مسار قاعدة البيانات الجديد والمبسط (مجموعة البيانات)
-        const VOTERS_COLLECTION_NAME = 'voters'; 
+        const VOTERS_COLLECTION_NAME = 'voters';
         
-        // 1.3. تحديد المتغيرات
-        const firebaseConfig = MANUAL_FIREBASE_CONFIG;
-        const initialAuthToken = null; 
+        // 3. تهيئة Firebase وخدماتها
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let votersData = []; // متغير لتخزين جميع بيانات الناخبين محليًا
         
-        // ******************************************************************************
-        // ****** نهاية الإعدادات  *****************************************************
-        // ******************************************************************************
-
-        let db, auth, userId = null;
-        let allVotersData = []; 
-        let isEditing = false; 
-
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const userIdDisplay = document.getElementById('userIdDisplay');
-        const submitBtn = document.getElementById('submitBtn');
-        const errorMsg = document.getElementById('errorMsg');
-        const searchQueryInput = document.getElementById('searchQuery');
-        const searchStatus = document.getElementById('searchStatus');
-
-        // دالة لعرض رسالة خطأ مؤقتة
-        function displayError(message) {
-            errorMsg.textContent = message;
-            errorMsg.style.display = 'block';
-            submitBtn.disabled = true;
-            setTimeout(() => {
-                errorMsg.style.display = 'none';
-                submitBtn.disabled = false;
-            }, 5000);
-        }
-
-        // 2. تهيئة Firebase والمصادقة
+        // **********************************************
+        
+        /**
+         * دالة لتهيئة الاتصال بـ Firebase والمصادقة المجهولة.
+         */
         async function initializeFirebase() {
-            loadingIndicator.style.display = 'block';
-            
             try {
-                setLogLevel('debug');
+                // تسجيل دخول المستخدم بشكل مجهول
+                const userCredential = await signInAnonymously(auth);
+                console.log("تم تسجيل الدخول بنجاح كـ:", userCredential.user.uid);
                 
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                // **استخدام المصادقة المجهولة**
-                await signInAnonymously(auth);
-
-                userId = auth.currentUser?.uid || 'Unknown-User';
-                userIdDisplay.textContent = `معرّف الجلسة: ${userId}`;
-                
-                console.log("Firebase initialized and user authenticated:", userId);
-
-                // بدء الاستماع للتحديثات الفورية (المزامنة)
-                setupRealtimeListener();
-
+                // بدء المزامنة الفورية بمجرد المصادقة بنجاح
+                setupRealtimeListener(); 
             } catch (error) {
-                console.error("Error during Firebase initialization or authentication:", error);
-                
-                // **** رسالة التوجيه ****
-                if (error.code === 'auth/api-key-not-valid') {
-                     displayError('خطأ حاسم: المفتاح لا يزال غير صالح. يرجى التأكد من مفتاح API في إعدادات Firebase والـ Google Cloud Console (APIs & Services).');
-                } else {
-                     displayError(`فشل الاتصال بالخدمة: ${error.message}. تأكد من تفعيل قواعد الأمان والمصادقة المجهولة.`);
-                }
-                
-            } finally {
-                loadingIndicator.style.display = 'none';
+                console.error("فشل في تهيئة Firebase أو المصادقة:", error);
+                document.getElementById('formMessage').innerText = "فشل الاتصال بقاعدة البيانات. راجع الكونسول.";
             }
         }
 
-        // 3. الاستماع للتحديثات الفورية (المزامنة)
+        /**
+         * تستمع إلى أي تغييرات في مجموعة 'voters' وتحدث الجدول تلقائياً.
+         */
         function setupRealtimeListener() {
-            if (!db) return;
-
-            // **استخدام المسار المبسط**
-            const votersCollection = collection(db, VOTERS_COLLECTION_NAME);
-            const q = query(votersCollection);
-
-            // onSnapshot تستمع للتغييرات في الوقت الحقيقي
-            onSnapshot(q, (snapshot) => {
-                const changes = snapshot.docChanges();
-                if (changes.length > 0) {
-                    console.log(`Received ${changes.length} updates from Firestore.`);
-                }
-                
-                // تحديث البيانات الكاملة المخزنة محلياً
-                // يتم حفظ Doc ID هنا (doc.id) وهو ضروري لعمليتي الحذف والتعديل
-                allVotersData = snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
-                
-                // إعادة عرض الجدول مع تطبيق البحث الحالي
-                filterAndRenderTable(searchQueryInput.value);
+            const votersCol = collection(db, VOTERS_COLLECTION_NAME);
+            onSnapshot(votersCol, (snapshot) => {
+                votersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                filterAndRenderTable(); // عرض البيانات المحدثة
             }, (error) => {
-                console.error("Error listening to collection:", error);
-                displayError("فشل في مزامنة البيانات.");
+                console.error("خطأ في الاستماع للبيانات:", error);
             });
         }
-
-        // 4. وظيفة إضافة البيانات 
+        
+        /**
+         * معالج نموذج الإضافة.
+         */
         document.getElementById('voterForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const nameInput = document.getElementById('voterName');
+            const nationalIdInput = document.getElementById('voterNationalId');
+            const nationalId = nationalIdInput.value.trim();
+            const name = nameInput.value.trim();
+            const messageElement = document.getElementById('formMessage');
 
-            if (!db || !userId) {
-                displayError("الخدمة غير جاهزة. يرجى الانتظار أو إعادة التحميل.");
+            if (nationalId.length !== 14 || !/^\d{14}$/.test(nationalId)) {
+                messageElement.innerText = "الرقم القومي يجب أن يكون 14 رقماً.";
                 return;
             }
-
-            const name = document.getElementById('name').value.trim();
-            const nationalId = document.getElementById('nationalId').value.trim();
-            const committee = document.getElementById('committee').value.trim();
-            const committeeNumber = document.getElementById('committeeNumber').value.trim();
-
-            // التحقق من الرقم القومي (14 رقم)
-            if (!/^[0-9]{14}$/.test(nationalId)) {
-                displayError("الرقم القومي غير صحيح. يجب أن يكون 14 رقماً.");
-                return;
-            }
-
-            const newVoter = {
-                name: name,
-                nationalId: nationalId,
-                committee: committee,
-                committeeNumber: parseInt(committeeNumber),
-                createdAt: new Date(),
-                createdBy: userId
-            };
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'جاري الإضافة...';
 
             try {
-                // **استخدام المسار المبسط**
-                await addDoc(collection(db, VOTERS_COLLECTION_NAME), newVoter);
+                // استخدام addDoc لإضافة سجل جديد
+                await addDoc(collection(db, VOTERS_COLLECTION_NAME), {
+                    nationalId: nationalId,
+                    name: name,
+                    createdAt: new Date() // إضافة وقت الإنشاء
+                });
                 
-                // مسح حقول النموذج بعد الإضافة الناجحة
-                e.target.reset(); 
-
+                messageElement.innerText = "تمت إضافة الناخب بنجاح.";
+                nameInput.value = '';
+                nationalIdInput.value = '';
+                setTimeout(() => messageElement.innerText = '', 3000); // مسح الرسالة
             } catch (e) {
-                console.error("Error adding document: ", e);
-                displayError(`خطأ في إضافة البيانات: ${e.message}`);
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'إضافة ناخب';
+                console.error("خطأ في إضافة المستند: ", e);
+                messageElement.innerText = "فشل الإضافة: " + e.message;
             }
         });
 
-        // 5. وظيفة تصفية وعرض الجدول (الآن مع أزرار التعديل والحذف)
-        function filterAndRenderTable(searchQuery) {
-            const tableBody = document.getElementById('votersTableBody');
-            tableBody.innerHTML = ''; // تفريغ الجدول
+        /**
+         * وظيفة عرض البيانات. تقوم بالتصفية ثم تعرضها في الجدول.
+         */
+        window.filterAndRenderTable = function() {
+            const tableBody = document.querySelector('#votersTable tbody');
+            const searchTerm = document.getElementById('searchField').value.toLowerCase().trim();
+            tableBody.innerHTML = ''; // مسح الجدول القديم
+            
+            const filteredData = votersData.filter(voter => 
+                voter.name.toLowerCase().includes(searchTerm) || 
+                voter.nationalId.includes(searchTerm)
+            );
 
-            const query = searchQuery.toLowerCase().trim();
-            let filteredData = allVotersData;
-
-            if (query.length > 0) {
-                // تصفية البيانات محلياً (بحث موحد بالاسم أو الرقم القومي)
-                filteredData = allVotersData.filter(voter => {
-                    const nameMatch = voter.name && voter.name.toLowerCase().includes(query);
-                    const idMatch = voter.nationalId && voter.nationalId.includes(query);
-                    return nameMatch || idMatch;
-                });
-                searchStatus.textContent = `تم العثور على ${filteredData.length} نتيجة مطابقة لـ "${query}"`;
-                searchStatus.style.display = 'block';
-            } else {
-                searchStatus.style.display = 'none';
-            }
-
-            if (filteredData.length === 0) {
-                // عرض رسالة "لا توجد بيانات"
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-gray-500 py-6">
-                    ${query.length > 0 ? 'لا توجد نتائج مطابقة لعملية البحث.' : 'لا توجد بيانات مسجلة حتى الآن.'}
-                </td></tr>`;
-                return;
-            }
-
-            // ترتيب البيانات حسب وقت الإنشاء (الأحدث أولاً)
-            filteredData.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
-
-            // إنشاء صفوف الجدول
-            filteredData.forEach((voter, index) => {
+            filteredData.forEach(voter => {
                 const row = tableBody.insertRow();
-                row.setAttribute('data-doc-id', voter.docId);
-                row.innerHTML = `
-                    <td class="text-gray-700">${index + 1}</td>
-                    <td class="text-gray-800 font-medium" data-field="name">${voter.name || '---'}</td>
-                    <td class="text-gray-700 font-mono" data-field="nationalId">${voter.nationalId || '---'}</td>
-                    <td class="text-gray-700" data-field="committee">${voter.committee || '---'}</td>
-                    <td class="text-gray-700" data-field="committeeNumber">${voter.committeeNumber || '---'}</td>
-                    <td>
-                        <button class="editBtn bg-yellow-500 text-white p-1 rounded text-xs hover:bg-yellow-600 transition" data-doc-id="${voter.docId}">تعديل</button>
-                        <button class="deleteBtn bg-red-500 text-white p-1 rounded text-xs hover:bg-red-600 transition" data-doc-id="${voter.docId}">حذف</button>
-                    </td>
+                row.setAttribute('data-id', voter.id); // إضافة معرّف المستند لسهولة الإجراءات
+                
+                // خلية الرقم القومي
+                const idCell = row.insertCell();
+                idCell.textContent = voter.nationalId;
+                idCell.className = 'national-id-cell';
+                
+                // خلية الاسم
+                const nameCell = row.insertCell();
+                nameCell.textContent = voter.name;
+                nameCell.className = 'name-cell';
+                
+                // خلية الإجراءات
+                const actionsCell = row.insertCell();
+                actionsCell.innerHTML = `
+                    <button onclick="handleEdit('${voter.id}')">تعديل</button>
+                    <button onclick="deleteVoter('${voter.id}')">حذف</button>
                 `;
             });
-            
-            // إضافة مستمعي الأحداث لأزرار التعديل والحذف
-            document.querySelectorAll('.editBtn').forEach(button => {
-                button.addEventListener('click', handleEdit);
-            });
-            document.querySelectorAll('.deleteBtn').forEach(button => {
-                button.addEventListener('click', handleDelete);
-            });
         }
+        
+        /**
+         * تحويل الصف إلى وضع التحرير.
+         */
+        window.handleEdit = function(docId) {
+            const row = document.querySelector(`tr[data-id="${docId}"]`);
+            if (!row) return;
 
-        // 6. وظيفة الحذف
-        async function deleteVoter(docId) {
-            // استبدال نافذة confirm بـ رسالة خطأ مؤقتة، حيث أن confirm غير مدعومة
-            if (!db) {
-                displayError("قاعدة البيانات غير متصلة.");
+            const nameCell = row.querySelector('.name-cell');
+            const nationalIdCell = row.querySelector('.national-id-cell');
+            const actionsCell = row.cells[2];
+
+            // تخزين القيم القديمة
+            const oldName = nameCell.textContent;
+            const oldId = nationalIdCell.textContent;
+
+            // تحويل الخلايا إلى حقول إدخال
+            nameCell.innerHTML = `<input type="text" id="edit-name-${docId}" value="${oldName}" required>`;
+            nationalIdCell.innerHTML = `<input type="text" id="edit-id-${docId}" value="${oldId}" pattern="[0-9]{14}" required>`;
+            
+            // تغيير أزرار الإجراءات
+            actionsCell.innerHTML = `
+                <button onclick="saveVoterUpdate('${docId}')">حفظ</button>
+                <button onclick="cancelEdit('${docId}', '${oldId}', '${oldName}')">إلغاء</button>
+            `;
+        }
+        
+        /**
+         * إرسال التعديلات إلى Firebase.
+         */
+        window.saveVoterUpdate = async function(docId) {
+            const newName = document.getElementById(`edit-name-${docId}`).value.trim();
+            const newId = document.getElementById(`edit-id-${docId}`).value.trim();
+            
+            if (newId.length !== 14 || !/^\d{14}$/.test(newId)) {
+                alert("الرقم القومي يجب أن يكون 14 رقماً.");
                 return;
             }
 
-            // بما أن confirm() غير مدعومة، سنفترض الموافقة أو يمكنك إضافة واجهة مستخدم مخصصة
-            if (true) { // هنا يمكن وضع منطق واجهة التأكيد المخصصة
-                try {
-                    // **استخدام المسار المبسط**
-                    const docRef = doc(db, VOTERS_COLLECTION_NAME, docId);
-                    await deleteDoc(docRef);
-                    console.log(`Document with ID ${docId} successfully deleted.`);
-                } catch (error) {
-                    console.error("Error deleting document: ", error);
-                    displayError("فشل في حذف السجل. حاول مجدداً.");
-                }
+            try {
+                const voterRef = doc(db, VOTERS_COLLECTION_NAME, docId);
+                // استخدام updateDoc لإرسال التعديلات
+                await updateDoc(voterRef, {
+                    name: newName,
+                    nationalId: newId
+                });
+                
+                // المزامنة الفورية ستتولى إعادة عرض البيانات وتحديث الصف
+                alert("تم تحديث السجل بنجاح!"); 
+            } catch (e) {
+                console.error("خطأ في تحديث المستند: ", e);
+                alert("فشل التحديث: " + e.message);
             }
         }
 
-        // 7. وظيفة التعديل
-        function handleEdit(e) {
-            if (isEditing) {
-                // منع التعديل على أكثر من صف واحد في نفس الوقت
-                return; 
-            }
-            isEditing = true;
-
-            const docId = e.target.getAttribute('data-doc-id');
-            const row = e.target.closest('tr');
-            
-            // استخراج الأزرار الأصلية
-            const originalButtons = row.querySelector('td:last-child').innerHTML;
-
-            // تحويل الحقول إلى مدخلات (Inputs)
-            ['name', 'nationalId', 'committee', 'committeeNumber'].forEach(field => {
-                const cell = row.querySelector(`[data-field="${field}"]`);
-                const originalValue = cell.textContent;
-                let inputType = field === 'committeeNumber' ? 'number' : 'text';
-                
-                // إضافة فحص خاص بالرقم القومي لمنع تغيير عدد الأرقام
-                if (field === 'nationalId') inputType = 'text';
-
-                cell.innerHTML = `<input type="${inputType}" class="edit-input" data-original-value="${originalValue}" value="${originalValue}" data-field-name="${field}">`;
-            });
-
-            // تغيير زر "تعديل" إلى "حفظ" وإضافة زر "إلغاء"
-            row.querySelector('td:last-child').innerHTML = `
-                <button class="saveBtn bg-green-500 text-white p-1 rounded text-xs hover:bg-green-600 transition">حفظ</button>
-                <button class="cancelBtn bg-gray-500 text-white p-1 rounded text-xs hover:bg-gray-600 transition">إلغاء</button>
-            `;
-
-            // إضافة مستمعي أحداث لزر الحفظ والإلغاء
-            row.querySelector('.saveBtn').addEventListener('click', () => saveVoterUpdate(docId, row, originalButtons));
-            row.querySelector('.cancelBtn').addEventListener('click', () => cancelVoterUpdate(row, originalButtons));
+        /**
+         * إلغاء التحرير واستعادة القيم القديمة.
+         */
+        window.cancelEdit = function(docId, oldId, oldName) {
+            // إعادة تفعيل العرض التلقائي عبر إعادة تحميل البيانات من الذاكرة المحلية وعرضها
+            filterAndRenderTable();
         }
 
-        // 8. وظيفة حفظ التعديلات
-        async function saveVoterUpdate(docId, row, originalButtons) {
-            const updatedData = {};
-            let isValid = true;
-
-            // جمع البيانات المحدثة من حقول الإدخال
-            row.querySelectorAll('.edit-input').forEach(input => {
-                const fieldName = input.getAttribute('data-field-name');
-                const newValue = input.value.trim();
-
-                if (fieldName === 'nationalId' && (!/^[0-9]{14}$/.test(newValue))) {
-                    // استخدام displayError بدلاً من alert
-                    displayError("الرقم القومي غير صحيح. يجب أن يكون 14 رقماً.");
-                    isValid = false;
-                }
-                
-                updatedData[fieldName] = (fieldName === 'committeeNumber') ? parseInt(newValue) : newValue;
-            });
-
-            if (!isValid) return;
+        /**
+         * وظيفة الحذف.
+         */
+        window.deleteVoter = async function(docId) {
+            if (!confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
 
             try {
-                // **استخدام المسار المبسط**
-                const docRef = doc(db, VOTERS_COLLECTION_NAME, docId);
-                await updateDoc(docRef, updatedData);
-                console.log(`Document with ID ${docId} successfully updated.`);
-            } catch (error) {
-                console.error("Error updating document: ", error);
-                displayError("فشل في حفظ التعديلات.");
-            } finally {
-                // إعادة عرض الأزرار الأصلية وإنهاء وضع التعديل (سيتم تحديث الجدول تلقائياً بفضل onSnapshot)
-                isEditing = false;
-                cancelVoterUpdate(row, originalButtons); // لإعادة الحالة
+                const voterRef = doc(db, VOTERS_COLLECTION_NAME, docId);
+                // استخدام deleteDoc لإزالة السجل
+                await deleteDoc(voterRef);
+                
+                // المزامنة الفورية ستتولى إزالة الصف من الجدول
+                alert("تم حذف السجل بنجاح!");
+            } catch (e) {
+                console.error("خطأ في حذف المستند: ", e);
+                alert("فشل الحذف: " + e.message);
             }
         }
 
-        // 9. وظيفة إلغاء التعديلات
-        function cancelVoterUpdate(row, originalButtons) {
-            // إعادة الخلايا إلى نص عادي
-            row.querySelectorAll('td').forEach(cell => {
-                const input = cell.querySelector('.edit-input');
-                if (input) {
-                    // استخدام القيمة الأصلية المخزنة في الخاصية
-                    cell.textContent = input.getAttribute('data-original-value');
-                }
-            });
+        // بدء تهيئة Firebase عند تحميل الصفحة
+        initializeFirebase();
 
-            // إعادة الأزرار الأصلية
-            row.querySelector('td:last-child').innerHTML = originalButtons;
-            
-            // إعادة تعيين مستمعي الأحداث بعد إعادة إنشاء الأزرار
-            row.querySelector('.editBtn')?.addEventListener('click', handleEdit);
-            row.querySelector('.deleteBtn')?.addEventListener('click', handleDelete);
-
-            isEditing = false;
-        }
-        
-        // 10. تفعيل الحذف عند النقر
-        function handleDelete(e) {
-            const docId = e.target.getAttribute('data-doc-id');
-            deleteVoter(docId);
-        }
-        
-        // 11. تفعيل البحث عند الكتابة (بدون تغيير)
-        searchQueryInput.addEventListener('input', (e) => {
-            filterAndRenderTable(e.target.value);
-        });
-
-        // بدء تهيئة التطبيق عند تحميل الصفحة
-        window.onload = initializeFirebase;
     </script>
 </body>
 </html>
