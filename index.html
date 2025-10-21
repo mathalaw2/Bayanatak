@@ -1,0 +1,331 @@
+<!--
+    تطبيق قاعدة بيانات الناخبين المشتركة (Firebase Firestore)
+    هذا الملف يجمع بين نموذج الإدخال، خاصية البحث، والمزامنة الفورية للبيانات.
+    يستخدم Tailwind CSS للتصميم المتجاوب.
+-->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سجل الناخبين المشترك - مزامنة فورية</title>
+    <!-- تحميل Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- خط Inter (لتحسين القراءة على مختلف الأجهزة) -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fc;
+        }
+        .card {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        .data-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: 100%;
+        }
+        .data-table th, .data-table td {
+            padding: 12px 15px;
+            text-align: right;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .data-table th {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .data-table tr:hover {
+            background-color: #f9fafb;
+        }
+        /* لتطبيق RTL على حقول الإدخال */
+        input::placeholder {
+            text-align: right;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-6xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-extrabold text-blue-800 mb-2">قاعدة بيانات الناخبين المشتركة</h1>
+            <p class="text-gray-600">إضافة، بحث، ومزامنة فورية للبيانات بين جميع المشاركين.</p>
+            <div id="loadingIndicator" class="mt-4 text-blue-500 font-semibold" style="display: none;">جارٍ تحميل وتهيئة البيانات...</div>
+            <p id="userIdDisplay" class="text-xs mt-2 p-1 bg-blue-100 rounded inline-block">معرّف الجلسة: جارٍ التحميل...</p>
+        </header>
+
+        <!-- قسم الإدخال - إضافة ناخب جديد -->
+        <div class="card bg-white p-6 rounded-xl mb-8">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">إضافة ناخب جديد</h2>
+            <form id="voterForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <!-- حقل الاسم -->
+                    <input type="text" id="name" placeholder="الاسم كاملاً" required
+                           class="col-span-1 md:col-span-2 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
+                           title="الاسم الكامل للناخب">
+
+                    <!-- حقل الرقم القومي -->
+                    <input type="text" id="nationalId" placeholder="الرقم القومي (14 رقم)" required maxlength="14" pattern="[0-9]{14}"
+                           class="col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
+                           title="يجب أن يكون الرقم القومي 14 رقماً">
+
+                    <!-- حقل اللجنة -->
+                    <input type="text" id="committee" placeholder="اسم/مقر اللجنة" required
+                           class="col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
+                           title="اسم أو عنوان مقر اللجنة">
+
+                    <!-- حقل رقم اللجنة -->
+                    <input type="number" id="committeeNumber" placeholder="رقم اللجنة" required
+                           class="col-span-1 p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-right"
+                           title="رقم اللجنة الفرعي">
+                </div>
+
+                <button type="submit" id="submitBtn"
+                        class="w-full bg-blue-600 text-white font-semibold py-3 rounded-lg hover:bg-blue-700 transition duration-300 ease-in-out disabled:bg-gray-400">
+                    إضافة ناخب
+                </button>
+                <p id="errorMsg" class="text-red-600 text-center mt-2" style="display: none;"></p>
+            </form>
+        </div>
+
+        <!-- قسم البحث والجدول -->
+        <div class="card bg-white p-6 rounded-xl">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 border-b pb-2">سجل الناخبين (مزامنة فورية)</h2>
+
+            <!-- حقل البحث -->
+            <input type="text" id="searchQuery" placeholder="ابحث بالاسم أو الرقم القومي..."
+                   class="w-full p-3 border border-gray-300 rounded-lg mb-4 focus:ring-purple-500 focus:border-purple-500 text-right"
+                   title="للبحث الفوري عن بيانات الناخبين">
+
+            <!-- مؤشر حالة البحث -->
+            <p id="searchStatus" class="text-sm text-gray-500 mb-3" style="display: none;"></p>
+
+            <div class="overflow-x-auto">
+                <table id="votersTable" class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="rounded-tr-lg">مسلسل</th>
+                            <th>الاسم</th>
+                            <th>الرقم القومي</th>
+                            <th>اللجنة</th>
+                            <th class="rounded-tl-lg">رقم اللجنة</th>
+                        </tr>
+                    </thead>
+                    <tbody id="votersTableBody">
+                        <!-- سيتم ملء البيانات هنا بواسطة JavaScript -->
+                        <tr id="emptyRow">
+                            <td colspan="5" class="text-center text-gray-500 py-6">لا توجد بيانات متاحة.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // 1. تعريف المتغيرات العالمية المتاحة في البيئة (مهم جداً)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-voters-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth, userId = null;
+        let allVotersData = []; // لتخزين جميع البيانات لتسهيل عملية البحث المحلي
+
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const submitBtn = document.getElementById('submitBtn');
+        const errorMsg = document.getElementById('errorMsg');
+        const searchQueryInput = document.getElementById('searchQuery');
+        const searchStatus = document.getElementById('searchStatus');
+
+        // دالة لعرض رسالة خطأ مؤقتة
+        function displayError(message) {
+            errorMsg.textContent = message;
+            errorMsg.style.display = 'block';
+            submitBtn.disabled = true;
+            setTimeout(() => {
+                errorMsg.style.display = 'none';
+                submitBtn.disabled = false;
+            }, 5000);
+        }
+
+        // 2. تهيئة Firebase والمصادقة
+        async function initializeFirebase() {
+            loadingIndicator.style.display = 'block';
+            if (!firebaseConfig) {
+                console.error("Firebase config is missing.");
+                displayError("خطأ: إعدادات قاعدة البيانات غير متوفرة.");
+                return;
+            }
+
+            try {
+                // تفعيل وضع التصحيح (Debug) لرؤية معلومات الاتصال
+                setLogLevel('debug');
+                
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // المصادقة باستخدام الرمز المخصص أو كمجهول
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                userId = auth.currentUser?.uid || 'Unknown-User';
+                userIdDisplay.textContent = `معرّف الجلسة: ${userId}`;
+                
+                console.log("Firebase initialized and user authenticated:", userId);
+
+                // بدء الاستماع للتحديثات الفورية (المزامنة)
+                setupRealtimeListener();
+
+            } catch (error) {
+                console.error("Error during Firebase initialization or authentication:", error);
+                displayError(`فشل الاتصال بالخدمة: ${error.message}`);
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        // 3. الاستماع للتحديثات الفورية (المزامنة)
+        function setupRealtimeListener() {
+            if (!db) return;
+
+            // تحديد مسار البيانات العامة المشتركة
+            const collectionPath = `/artifacts/${appId}/public/data/voters`;
+            const votersCollection = collection(db, collectionPath);
+            const q = query(votersCollection);
+
+            // onSnapshot تستمع للتغييرات في الوقت الحقيقي
+            onSnapshot(q, (snapshot) => {
+                const changes = snapshot.docChanges();
+                if (changes.length > 0) {
+                    console.log(`Received ${changes.length} updates from Firestore.`);
+                }
+                
+                // تحديث البيانات الكاملة المخزنة محلياً
+                allVotersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // إعادة عرض الجدول مع تطبيق البحث الحالي
+                filterAndRenderTable(searchQueryInput.value);
+            }, (error) => {
+                console.error("Error listening to collection:", error);
+                displayError("فشل في مزامنة البيانات.");
+            });
+        }
+
+        // 4. وظيفة إضافة البيانات
+        document.getElementById('voterForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!db || !userId) {
+                displayError("الخدمة غير جاهزة. يرجى الانتظار أو إعادة التحميل.");
+                return;
+            }
+
+            const name = document.getElementById('name').value.trim();
+            const nationalId = document.getElementById('nationalId').value.trim();
+            const committee = document.getElementById('committee').value.trim();
+            const committeeNumber = document.getElementById('committeeNumber').value.trim();
+
+            // التحقق من الرقم القومي (14 رقم)
+            if (!/^[0-9]{14}$/.test(nationalId)) {
+                displayError("الرقم القومي غير صحيح. يجب أن يكون 14 رقماً.");
+                return;
+            }
+
+            const newVoter = {
+                name: name,
+                nationalId: nationalId,
+                committee: committee,
+                committeeNumber: parseInt(committeeNumber),
+                createdAt: new Date(),
+                createdBy: userId
+            };
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'جاري الإضافة...';
+
+            try {
+                // استخدام addDoc لإضافة مستند جديد
+                const docRef = await addDoc(collection(db, `/artifacts/${appId}/public/data/voters`), newVoter);
+                console.log("Document successfully written with ID:", docRef.id);
+                
+                // مسح حقول النموذج بعد الإضافة الناجحة
+                e.target.reset(); 
+
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                displayError(`خطأ في إضافة البيانات: ${e.message}`);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'إضافة ناخب';
+            }
+        });
+
+        // 5. وظيفة تصفية وعرض الجدول (التي تستخدمها المزامنة والبحث)
+        function filterAndRenderTable(searchQuery) {
+            const tableBody = document.getElementById('votersTableBody');
+            tableBody.innerHTML = ''; // تفريغ الجدول
+
+            const query = searchQuery.toLowerCase().trim();
+            let filteredData = allVotersData;
+
+            if (query.length > 0) {
+                // تصفية البيانات محلياً
+                filteredData = allVotersData.filter(voter => {
+                    const nameMatch = voter.name && voter.name.toLowerCase().includes(query);
+                    const idMatch = voter.nationalId && voter.nationalId.includes(query);
+                    return nameMatch || idMatch;
+                });
+                searchStatus.textContent = `تم العثور على ${filteredData.length} نتيجة مطابقة لـ "${query}"`;
+                searchStatus.style.display = 'block';
+            } else {
+                searchStatus.style.display = 'none';
+            }
+
+            if (filteredData.length === 0) {
+                // عرض رسالة "لا توجد بيانات"
+                tableBody.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-6">
+                    ${query.length > 0 ? 'لا توجد نتائج مطابقة لعملية البحث.' : 'لا توجد بيانات مسجلة حتى الآن.'}
+                </td></tr>`;
+                return;
+            }
+
+            // ترتيب البيانات حسب وقت الإنشاء (الأحدث أولاً)
+            filteredData.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+
+            // إنشاء صفوف الجدول
+            filteredData.forEach((voter, index) => {
+                const row = tableBody.insertRow();
+                // يمكننا إضافة زر حذف أو تعديل هنا لاحقاً إذا طلب المستخدم
+                row.innerHTML = `
+                    <td class="text-gray-700">${index + 1}</td>
+                    <td class="text-gray-800 font-medium">${voter.name || '---'}</td>
+                    <td class="text-gray-700 font-mono">${voter.nationalId || '---'}</td>
+                    <td class="text-gray-700">${voter.committee || '---'}</td>
+                    <td class="text-gray-700">${voter.committeeNumber || '---'}</td>
+                `;
+            });
+        }
+
+        // 6. تفعيل البحث عند الكتابة
+        searchQueryInput.addEventListener('input', (e) => {
+            filterAndRenderTable(e.target.value);
+        });
+
+        // بدء تهيئة التطبيق عند تحميل الصفحة
+        window.onload = initializeFirebase;
+    </script>
+</body>
+</html>
