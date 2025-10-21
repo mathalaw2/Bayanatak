@@ -57,6 +57,7 @@
 
         #voterForm input {
             flex: 1 1 200px; /* مرونة في الحجم */
+            min-width: 150px; /* ضمان أن تكون الحقول واضحة */
         }
         
         #searchSection {
@@ -116,6 +117,8 @@
             padding: 15px; 
             text-align: right; 
             border-bottom: 1px solid #e8e8e8;
+            /* للتأكد من انطباق الترتيب الجديد */
+            white-space: nowrap; /* منع التفاف النصوص في الجدول */
         }
 
         #votersTable th { 
@@ -294,13 +297,13 @@
             e.preventDefault();
             const nameInput = document.getElementById('voterName');
             const nationalIdInput = document.getElementById('voterNationalId');
-            const committeeNameInput = document.getElementById('voterCommitteeName'); // جديد
-            const committeeNumberInput = document.getElementById('voterCommitteeNumber'); // جديد
+            const committeeNameInput = document.getElementById('voterCommitteeName'); 
+            const committeeNumberInput = document.getElementById('voterCommitteeNumber'); 
             
             const nationalId = nationalIdInput.value.trim();
             const name = nameInput.value.trim();
-            const committeeName = committeeNameInput.value.trim(); // جديد
-            const committeeNumber = committeeNumberInput.value.trim(); // جديد
+            const committeeName = committeeNameInput.value.trim(); 
+            const committeeNumber = committeeNumberInput.value.trim(); 
             
             const messageElement = document.getElementById('formMessage');
 
@@ -316,8 +319,8 @@
                 await addDoc(collection(db, VOTERS_COLLECTION_NAME), {
                     nationalId: nationalId,
                     name: name,
-                    committeeName: committeeName, // حقل جديد
-                    committeeNumber: committeeNumber, // حقل جديد
+                    committeeName: committeeName, 
+                    committeeNumber: committeeNumber, 
                     createdAt: Timestamp.now() 
                 });
                 
@@ -325,8 +328,8 @@
                 messageElement.className = "message success";
                 nameInput.value = '';
                 nationalIdInput.value = '';
-                committeeNameInput.value = ''; // مسح الحقل
-                committeeNumberInput.value = ''; // مسح الحقل
+                committeeNameInput.value = ''; 
+                committeeNumberInput.value = ''; 
                 setTimeout(() => messageElement.innerText = '', 3000); 
             } catch (e) {
                 console.error("خطأ في إضافة المستند: ", e);
@@ -347,7 +350,7 @@
             const filteredData = votersData.filter(voter => 
                 voter.name?.toLowerCase().includes(searchTerm) || 
                 voter.nationalId?.includes(searchTerm) ||
-                voter.committeeName?.toLowerCase().includes(searchTerm) // بحث في اسم اللجنة
+                voter.committeeName?.toLowerCase().includes(searchTerm) 
             );
 
             filteredData.forEach((voter, index) => {
@@ -434,8 +437,8 @@
         window.saveVoterUpdate = async function(docId) {
             const newName = document.getElementById(`edit-name-${docId}`).value.trim();
             const newId = document.getElementById(`edit-id-${docId}`).value.trim();
-            const newCommName = document.getElementById(`edit-commName-${docId}`).value.trim(); // جديد
-            const newCommNum = document.getElementById(`edit-commNum-${docId}`).value.trim(); // جديد
+            const newCommName = document.getElementById(`edit-commName-${docId}`).value.trim(); 
+            const newCommNum = document.getElementById(`edit-commNum-${docId}`).value.trim(); 
             
             if (newId.length !== 14 || !/^\d{14}$/.test(newId)) {
                 alert("الرقم القومي يجب أن يكون 14 رقماً بالضبط.");
@@ -463,6 +466,7 @@
          * deleteVoter: وظيفة الحذف.
          */
         window.deleteVoter = async function(docId) {
+            // ملاحظة: لا يجب استخدام alert/confirm في التطبيقات المعروضة داخل إطار (iframe)، ولكن نتركها هنا كتطبيق مباشر
             if (!confirm("تأكيد الحذف: هل أنت متأكد من حذف هذا السجل بشكل دائم؟")) return;
 
             try {
