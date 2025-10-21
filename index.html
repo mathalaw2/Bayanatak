@@ -155,24 +155,20 @@
             measurementId: "G-RSHKVQBL7N"
         };
         
-        // 1.2. معرّف التطبيق ومعرّف قاعدة البيانات (Firebase App ID):
-        const MANUAL_APP_ID = 'bayanatak-f8c09'; 
+        // 1.2. مسار قاعدة البيانات الجديد والمبسط (مجموعة البيانات)
+        const VOTERS_COLLECTION_NAME = 'voters'; 
         
-        // 1.3. تحديد المتغيرات لاستخدام الإعدادات الثابتة أو الخاصة بالبيئة
-        const appId = typeof __app_id !== 'undefined' ? __app_id : MANUAL_APP_ID;
-        // نستخدم الإعدادات اليدوية في حال عدم توفر إعدادات البيئة (أي عند النشر الخارجي)
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : MANUAL_FIREBASE_CONFIG;
-        
-        // ملاحظة: الرمز الأولي للمصادقة غير متوفر في GitHub Pages، لذا سنستخدم المصادقة المجهولة مباشرة.
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null; 
+        // 1.3. تحديد المتغيرات
+        const firebaseConfig = MANUAL_FIREBASE_CONFIG;
+        const initialAuthToken = null; 
         
         // ******************************************************************************
         // ****** نهاية الإعدادات  *****************************************************
         // ******************************************************************************
 
         let db, auth, userId = null;
-        let allVotersData = []; // لتخزين جميع البيانات لتسهيل عملية البحث المحلي
-        let isEditing = false; // لمتابعة حالة التعديل
+        let allVotersData = []; 
+        let isEditing = false; 
 
         const loadingIndicator = document.getElementById('loadingIndicator');
         const userIdDisplay = document.getElementById('userIdDisplay');
@@ -196,30 +192,15 @@
         async function initializeFirebase() {
             loadingIndicator.style.display = 'block';
             
-            // تحقق بسيط من أن الإعدادات لم تعد فارغة
-            if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
-                const manualError = "خطأ: فشل في تحميل الإعدادات. يرجى التأكد من أن الإعدادات ثابتة وصحيحة.";
-                console.error(manualError);
-                loadingIndicator.style.display = 'none';
-                displayError(manualError);
-                return;
-            }
-
             try {
-                // تفعيل وضع التصحيح (Debug) لرؤية معلومات الاتصال
                 setLogLevel('debug');
                 
                 const app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
 
-                // المصادقة باستخدام الرمز المخصص أو كمجهول
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    // نعتمد على المصادقة المجهولة عندما لا يكون الرمز متوفراً (أي في GitHub Pages)
-                    await signInAnonymously(auth);
-                }
+                // **تم إزالة المصادقة المخصصة واستخدام المصادقة المجهولة فقط**
+                await signInAnonymously(auth);
 
                 userId = auth.currentUser?.uid || 'Unknown-User';
                 userIdDisplay.textContent = `معرّف الجلسة: ${userId}`;
@@ -231,7 +212,7 @@
 
             } catch (error) {
                 console.error("Error during Firebase initialization or authentication:", error);
-                displayError(`فشل الاتصال بالخدمة: ${error.message}`);
+                displayError(`فشل الاتصال بالخدمة: ${error.message}. تأكد من تفعيل قواعد الأمان وخدمة المصادقة المجهولة.`);
             } finally {
                 loadingIndicator.style.display = 'none';
             }
@@ -241,9 +222,8 @@
         function setupRealtimeListener() {
             if (!db) return;
 
-            // استخدام مسار البيانات العامة
-            const collectionPath = `/artifacts/${appId}/public/data/voters`;
-            const votersCollection = collection(db, collectionPath);
+            // **استخدام المسار المبسط**
+            const votersCollection = collection(db, VOTERS_COLLECTION_NAME);
             const q = query(votersCollection);
 
             // onSnapshot تستمع للتغييرات في الوقت الحقيقي
@@ -265,7 +245,7 @@
             });
         }
 
-        // 4. وظيفة إضافة البيانات (بدون تغيير)
+        // 4. وظيفة إضافة البيانات 
         document.getElementById('voterForm').addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -298,8 +278,8 @@
             submitBtn.textContent = 'جاري الإضافة...';
 
             try {
-                // استخدام addDoc لإضافة مستند جديد
-                await addDoc(collection(db, `/artifacts/${appId}/public/data/voters`), newVoter);
+                // **استخدام المسار المبسط**
+                await addDoc(collection(db, VOTERS_COLLECTION_NAME), newVoter);
                 
                 // مسح حقول النموذج بعد الإضافة الناجحة
                 e.target.reset(); 
@@ -382,7 +362,8 @@
             // بما أن confirm() غير مدعومة، سنفترض الموافقة أو يمكنك إضافة واجهة مستخدم مخصصة
             if (true) { // هنا يمكن وضع منطق واجهة التأكيد المخصصة
                 try {
-                    const docRef = doc(db, `/artifacts/${appId}/public/data/voters`, docId);
+                    // **استخدام المسار المبسط**
+                    const docRef = doc(db, VOTERS_COLLECTION_NAME, docId);
                     await deleteDoc(docRef);
                     console.log(`Document with ID ${docId} successfully deleted.`);
                 } catch (error) {
@@ -451,7 +432,8 @@
             if (!isValid) return;
 
             try {
-                const docRef = doc(db, `/artifacts/${appId}/public/data/voters`, docId);
+                // **استخدام المسار المبسط**
+                const docRef = doc(db, VOTERS_COLLECTION_NAME, docId);
                 await updateDoc(docRef, updatedData);
                 console.log(`Document with ID ${docId} successfully updated.`);
             } catch (error) {
