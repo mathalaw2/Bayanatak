@@ -145,9 +145,9 @@
         // ******************************************************************************
         
         // 1.1. إعدادات Firebase الثابتة:
-        // *** هذا المفتاح هو الذي أرسلته سابقًا، وقد يكون هو سبب المشكلة إذا كان مقيداً. ***
+        // *** المفتاح الجديد والصحيح من إعدادات مشروعك: AIzaSyDCE3XXGKBXMNNAXBWEjOcD4YC4 ***
         const MANUAL_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyOCx8-XKNGBXMNNAXBWEjOcD4YC4",
+            apiKey: "AIzaSyDCE3XXGKBXMNNAXBWEjOcD4YC4", // تم التحديث إلى المفتاح الصحيح
             authDomain: "bayanatak-f8c09.firebaseapp.com",
             projectId: "bayanatak-f8c09",
             storageBucket: "bayanatak-f8c09.appspot.com",
@@ -214,9 +214,9 @@
             } catch (error) {
                 console.error("Error during Firebase initialization or authentication:", error);
                 
-                // **** التعديل هنا: إضافة رسالة توجيهية خاصة لمشكلة المفتاح ****
+                // **** رسالة التوجيه ****
                 if (error.code === 'auth/api-key-not-valid') {
-                     displayError('خطأ في الاتصال: مفتاح API غير صالح. يرجى مراجعة إعدادات Firebase والـ API Key والتأكد من عدم وجود قيود عليه.');
+                     displayError('خطأ حاسم: المفتاح لا يزال غير صالح. يرجى التأكد من مفتاح API في إعدادات Firebase والـ Google Cloud Console (APIs & Services).');
                 } else {
                      displayError(`فشل الاتصال بالخدمة: ${error.message}. تأكد من تفعيل قواعد الأمان والمصادقة المجهولة.`);
                 }
